@@ -38,7 +38,7 @@ Coded by www.creative-tim.com
 // Soft UI Dashboard React layouts
 import Dashboard from "layouts/dashboard";
 import Positions from "layouts/positions";
-import Tables from "layouts/instruments";
+import Instruments from "layouts/instruments";
 import Analytics from "layouts/analytics";
 import Profile from "layouts/profile";
 import Chatbot from "layouts/chatbot";
@@ -66,10 +66,10 @@ const routes = [
   {
     type: "collapse",
     name: "Instrument",
-    key: "tables",
-    route: "/tables",
+    key: "instruments",
+    route: "/instruments",
     icon: <Document size="12px" />,
-    component: Tables,
+    component: Instruments,
     noCollapse: true,
   },
   {

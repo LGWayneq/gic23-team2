@@ -86,8 +86,11 @@ def map_instrument_id(symbol):
     if document:
         return document["_id"]
     else:
-        return instrumentsCollection.find_one({ "isinCode": symbol })
-
+        document = instrumentsCollection.find_one({ "isinCode": symbol })
+        if document:
+            return document["_id"]
+        else:
+            return None
 
 def get_reported_date(file_path):
     split_path = file_path.split(".")[-2]

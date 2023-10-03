@@ -7,33 +7,56 @@ from database import db
 positionsCollection = db.positions
 priceCollection = db.price
 
-def get_fund_aggregate(fundId, upperBoundDate, aggregateKey):
-    # pipeline = [
-    #     {
-    #         "$match": {
-    #             # "fundId": fundId,
-    #             "reportedDate": {"$lt": upperBoundDate}
-    #         }
-    #     }
-    # ]
+def get_fund_aggregate(aggregateKey, fundId, startDate, endDate):
+    if aggregateKey == "instrumentName":
+        pipeline = [
+            {
+                "$match": {
+                    "fundId" : int(fundId),
+                    "reportedDate": {"$gte": startDate, "$lte": endDate}
+                }
+            },
+            {
+                "$group": {
+                    "_id": "$" + aggregateKey,
+                    "totalMarketValue": {
+                        "$sum": "$marketValue"
+                    }
+                }
+            }
+        ]
+    else:
+        pipeline = [
+            {
+                "$match": {
+                    "fundId" : int(fundId),
+                    "reportedDate": {"$gte": startDate, "$lte": endDate}
+                }
+            },
+            {
+                "$lookup": {
+                    "from": "instruments",
+                    "localField": "instrumentId",
+                    "foreignField": "_id",
+                    "as": "instrument_data"
+                }
+            },
+            {
+                "$unwind": "$instrument_data"
+            },
+            {
+                "$group": {
+                    "_id": "$instrument_data." + aggregateKey,
+                    "totalMarketValue": {
+                        "$sum": "$marketValue"
+                    }
+                }
+            }
+        ]
+    result = list(db.positions.aggregate(pipeline))
+    return make_json_response(result, 200)
 
-    # match_result = list(positionsCollection.aggregate(pipeline))
-    # aggregated_dict = {}
-    # for doc in match_result:
-    #     if doc[aggregateKey] in aggregated_dict:
-    #         if doc["instrumentType"] == "CASH":
-    #             aggregated_dict[doc[aggregateKey]] += doc["marketValue"]
-    #             continue
-    #         # aggregated_dict[doc[aggregateKey]] += doc["quantity"] * get_latest_instrument_price(doc, upperBoundDate, priceCollection)
-    #         aggregated_dict[doc[aggregateKey]] += doc["marketValue"]
-    #     else:
-    #         if doc["instrumentType"] == "CASH":
-    #             aggregated_dict[doc[aggregateKey]] = doc["marketValue"]
-    #             continue
-    #         # aggregated_dict[doc[aggregateKey]] = doc["quantity"] * get_latest_instrument_price(doc, upperBoundDate, priceCollection)
-    #         aggregated_dict[doc[aggregateKey]] = doc["marketValue"]
-
-    # return make_json_response(aggregated_dict, 200)
+def get_country_aggregate():
     pipeline = [
         {
             "$lookup": {
@@ -47,57 +70,32 @@ def get_fund_aggregate(fundId, upperBoundDate, aggregateKey):
             "$unwind": "$instrument_data"
         },
         {
-            "$lookup": {
-                "from": "price",
-                "let": {
-                    "isinCode": "$instrument_data.isinCode",
-                    "symbol": "$instrument_data.symbol"
-                },
-                "pipeline": [
-                    {
-                        "$match": {
-                            "$expr": {
-                                "$or": [
-                                    {"$eq": ["$isinCode", "$$isinCode"]},
-                                    {"$eq": ["$symbol", "$$symbol"]},
-                                    {"$eq": ["$isinCode", "$$symbol"]},
-                                    {"$eq": ["$symbol", "$$isinCode"]}
-                                ]
-                            }
-                        }
-                    },
-                    {
-                        "$match": {
-                            "reportedDate": {"$lte": upperBoundDate}
-                        }
-                    },
-                    {
-                        "$sort": {
-                            "reportedDate": -1
-                        }
-                    },
-                    {
-                        "$limit": 1
-                    }
-                ],
-                "as": "price_data"
-            }
-        },
-        {
-            "$unwind": "$price_data"
-        },
-        {
             "$group": {
-                "_id": f"$instrument_data.{aggregateKey}",
+                "_id": "$instrument_data.country",
                 "totalMarketValue": {
-                    "$sum": {
-                        "$multiply": ["$quantity", "$price_data.unitPrice"]
-                    }
+                    "$sum": "$marketValue"
                 }
             }
         }
     ]
-    result = list(positionsCollection.aggregate(pipeline))
+    result = list(db.positions.aggregate(pipeline))
+    return make_json_response(result, 200)
+
+def get_funds_performance():
+    pipeline = [
+        {
+            "$group": {
+                "_id": {
+                    "fund": "$fund",
+                    "reportedDate": "$reportedDate" ,
+                },
+                "totalMarketValue": {
+                    "$sum": "$marketValue"
+                }
+            }
+        }
+    ]
+    result = list(db.positions.aggregate(pipeline))
     return make_json_response(result, 200)
 
 def get_latest_instrument_price(document, upperBoundDate):
@@ -352,7 +350,7 @@ def get_total_investment_returns_instruments(lowerDate, upperDate):
 
     return make_json_response(json_util.dumps(returns), 200)
 
-def get_top_N(N):
+def get_top_N():
     pipeline = [
         {
             "$sort": {
@@ -361,7 +359,7 @@ def get_top_N(N):
         },
         {
             "$group": {
-                "_id": "$fundId",
+                "_id": "$fund",
                 "marketValue": {"$first": "$marketValue"}
             }
         },
@@ -376,7 +374,7 @@ def get_top_N(N):
         },
         {
             "$group": {
-                "_id": "$fundId",
+                "_id": "$fund",
                 "marketValue": {"$first": "$marketValue"},
             }
         },
@@ -387,9 +385,9 @@ def get_top_N(N):
     for oldFund in old_market_values:
         for newFund in latest_market_values:
             if oldFund["_id"] == newFund["_id"]:
-                returns[oldFund["_id"]] = newFund["marketValue"]/oldFund["marketValue"] - 1
+                returns[oldFund["_id"]] = (newFund["marketValue"]/oldFund["marketValue"] - 1) * 100
 
-    topN = dict(sorted(returns.items(), key=lambda item: item[1], reverse=True)[:N])
+    topN = dict(sorted(returns.items(), key=lambda item: item[1], reverse=True))
 
     return make_json_response(json_util.dumps(topN), 200)
 

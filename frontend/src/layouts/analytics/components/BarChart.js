@@ -62,17 +62,6 @@ function BarChart() {
         },]
     };
 
-
-    fetch('http://3.0.49.217/instruments/')
-        .then(response => response.json())
-        .then(data => {
-            const series = data.map(item => ({
-                name: 'Year ' + item.year,
-                data: item.values
-            }));
-            setData(series); // Assuming setData is a function that accepts the series data
-        })
-        .catch(error => console.error('Error fetching messages:', error));
     return (
         <div>
             <HighchartsReact

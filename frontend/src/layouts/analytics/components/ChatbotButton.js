@@ -30,7 +30,7 @@ function ChatbotButton() {
             </SuiBox>
             {isCardOpen && (
                 <SuiBox>
-                    <ChatUI></ChatUI>               
+                    <ChatUI/>               
                 </SuiBox>
             )}
         </div>

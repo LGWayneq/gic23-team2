@@ -31,6 +31,7 @@ import { useState, useEffect } from 'react';
 import ImportPopup from "./components/ImportPopup";
 import FilterSortTable from "../../components/FilterSortTable"
 import Table from "./components/Table";
+import { get } from "api/api";
 
 function Instruments() {
   const classes = styles();
@@ -42,14 +43,10 @@ function Instruments() {
     fetchMessages();
   }, []);
 
-  function fetchMessages() {
-    fetch('http://3.0.49.217/instruments')
-      .then(response => response.json())
-      .then(data => {
-        const dataArray = JSON.parse(data.data);
-        setData(dataArray);
-      })
-      .catch(error => console.error('Error fetching messages:', error));
+  async function fetchMessages() {
+    const res = await get('/instruments/');
+    console.log(JSON.parse(res.data))
+    setData(JSON.parse(res.data));
   }
 
   function getColumns() {
@@ -61,7 +58,6 @@ function Instruments() {
       });
   }
 
-  //CHECK how to pass data to table
   return (
     <DashboardLayout>
       <DashboardNavbar />

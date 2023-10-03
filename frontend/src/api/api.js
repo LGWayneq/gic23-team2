@@ -1,3 +1,5 @@
+const BACKEND_URL = "http://localhost:80";
+
 export async function get(url, body, setLoadingCallback = null) {
     const requestOptions = {
         method: 'GET',
@@ -38,7 +40,7 @@ export async function postFile(url, file, setLoadingCallback = null) {
 
 async function fetchJson(url, requestOptions, setLoadingCallback) {
     if (setLoadingCallback != null) setLoadingCallback(true);
-    const res = await fetch(url, requestOptions);
+    const res = await fetch(`${BACKEND_URL}${url}`, requestOptions);
     const json = await res.json();
     if (setLoadingCallback != null) setLoadingCallback(false);
     return json;

@@ -1,178 +1,83 @@
-// @mui material components
-import Grid from "@mui/material/Grid";
-import Icon from "@mui/material/Icon";
-
 // Soft UI Dashboard React components
 import SuiBox from "components/SuiBox";
-import SuiTypography from "components/SuiTypography";
 
 // Soft UI Dashboard React example components
 import DashboardLayout from "examples/LayoutContainers/DashboardLayout";
 import DashboardNavbar from "examples/Navbars/DashboardNavbar";
-import Footer from "examples/Footer";
-import MiniStatisticsCard from "examples/Cards/StatisticsCards/MiniStatisticsCard";
-import ReportsBarChart from "examples/Charts/BarCharts/ReportsBarChart";
-import GradientLineChart from "examples/Charts/LineCharts/GradientLineChart";
-
-// Soft UI Dashboard React base styles
-import typography from "assets/theme/base/typography";
-
-// Dashboard layout components
-import Projects from "layouts/dashboard/components/Projects";
-import OrderOverview from "layouts/dashboard/components/OrderOverview";
-
-// Data
-import reportsBarChartData from "layouts/dashboard/data/reportsBarChartData";
-import gradientLineChartData from "layouts/dashboard/data/gradientLineChartData";
-import Highcharts from 'highcharts';
-import HighchartsReact from 'highcharts-react-official';
 import LineGraph from "./components/LineGraph";
+import { useEffect, useState } from "react";
+import { get } from "api/api";
+import PieChart from "components/PieChart";
+import Loading from "components/Loading";
 
 function Dashboard() {
-  const { size } = typography;
-  const { chart, items } = reportsBarChartData;
-  const options = {
-    chart: {
-      plotBackgroundColor: null,
-      plotBorderWidth: null,
-      plotShadow: false,
-      type: 'pie'
-    },
-    title: {
-      text: 'Positions by Country',
-      align: 'left'
-    },
-    tooltip: {
-      pointFormat: '{series.name}: <b>{point.percentage:.1f}%</b>'
-    },
-    accessibility: {
-      point: {
-        valueSuffix: '%'
-      }
-    },
-    plotOptions: {
-      pie: {
-        allowPointSelect: true,
-        cursor: 'pointer',
-        dataLabels: {
-          enabled: true,
-          format: '<b>{point.name}</b>: {point.percentage:.1f} %'
-        }
-      }
-    },
-    series: [{
-      name: 'Country',
-      colorByPoint: true,
-      data: [
-        { name: 'AU', y: 10.67, sliced: true, selected: true },
-        { name: 'DE', y: 14.77 },
-        { name: 'CN', y: 4.86 },
-        { name: 'UK', y: 15.63 },
-        { name: 'JP', y: 11.63 },
-        { name: 'SM', y: 5.63 },
-        { name: 'BB', y: 4.63 },
-        { name: 'IM', y: 2.63 },
-      ]
-    }]
-  };
+  const [countryData, setCountryData] = useState([]);
+  const [fundData, setFundData] = useState([]);
+  const [loading, setLoading] = useState(false);
 
+  function processCountryData(data) {
+    const res = [];
+    const combinedMarketValue = data.reduce((acc, item) => acc + item.totalMarketValue, 0);
+    const other = { name: 'Other', y: 0 };
+    data.forEach((item) => {
+      if (item.totalMarketValue / combinedMarketValue < 0.01) other.y += item.totalMarketValue;
+      else res.push({ name: item._id, y: item.totalMarketValue });
+    });
+
+    res.push(other);
+    return res;
+  }
+
+  function processFundData(inputData) {
+    const outputData = [];
+    const fundMap = new Map();
+    for (const item of inputData) {
+      const fundName = item._id.fund;
+      const marketValue = item.totalMarketValue;
+      const date = item._id.reportedDate;
+      if (!fundMap.has(fundName)) {
+        fundMap.set(fundName, new Array(8).fill(null));
+      }
+      const index = new Date(date).getMonth();
+      fundMap.get(fundName)[index] = marketValue/1000000;
+    }
+    for (const [fundName, marketValues] of fundMap) {
+      outputData.push({
+        name: fundName,
+        data: marketValues.map(x => x ? Math.round(x) : null)
+      });
+    }
+    return outputData;
+  }
+
+  async function fetchData() {
+    setLoading(true);
+    const countryRes = await get(`/analytics/country`)
+    setCountryData(processCountryData(countryRes.data));
+    const fundRes = await get(`/analytics/performance`)
+    setFundData(processFundData(fundRes.data));
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   return (
     <DashboardLayout>
       <DashboardNavbar />
       <SuiBox py={3}>
-        {/* <SuiBox mb={3}>
-          <Grid container spacing={3}>
-            <Grid item xs={12} sm={6} xl={3}>
-              <MiniStatisticsCard
-                title={{ text: "today's money" }}
-                count="$53,000"
-                percentage={{ color: "success", text: "+55%" }}
-                icon={{ color: "info", component: "paid" }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} xl={3}>
-              <MiniStatisticsCard
-                title={{ text: "today's users" }}
-                count="2,300"
-                percentage={{ color: "success", text: "+3%" }}
-                icon={{ color: "info", component: "public" }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} xl={3}>
-              <MiniStatisticsCard
-                title={{ text: "new clients" }}
-                count="+3,462"
-                percentage={{ color: "error", text: "-2%" }}
-                icon={{ color: "info", component: "emoji_events" }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} xl={3}>
-              <MiniStatisticsCard
-                title={{ text: "sales" }}
-                count="$103,430"
-                percentage={{ color: "success", text: "+5%" }}
-                icon={{
-                  color: "info",
-                  component: "shopping_cart",
-                }}
-              />
-            </Grid>
-          </Grid>
-        </SuiBox> */}
-
         <SuiBox mb={3}>
-          <HighchartsReact
-            highcharts={Highcharts}
-            options={options}
-          />
-          <LineGraph />
-
+          {loading && <Loading />}
+          <PieChart
+            title="Positions by Country"
+            labelName="Country"
+            data={countryData} />
+          <LineGraph
+            title='Total Positions Market Value (in millions)'
+            yAxisTitle="Market Value"
+            data={fundData} />
         </SuiBox>
-        {/* <SuiBox mb={3}>
-          <Grid container spacing={3}>
-            <Grid item xs={12} lg={5}>
-              <ReportsBarChart
-                title="active users"
-                description={
-                  <>
-                    (<strong>+23%</strong>) than last week
-                  </>
-                }
-                chart={chart}
-                items={items}
-              />
-            </Grid>
-            <Grid item xs={12} lg={7}>
-              <GradientLineChart
-                title="Sales Overview"
-                description={
-                  <SuiBox display="flex" alignItems="center">
-                    <SuiBox fontSize={size.lg} color="success" mb={0.3} mr={0.5} lineHeight={0}>
-                      <Icon className="font-bold">arrow_upward</Icon>
-                    </SuiBox>
-                    <SuiTypography variant="button" textColor="text" fontWeight="medium">
-                      4% more{" "}
-                      <SuiTypography variant="button" textColor="text" fontWeight="regular">
-                        in 2021
-                      </SuiTypography>
-                    </SuiTypography>
-                  </SuiBox>
-                }
-                height="20.25rem"
-                chart={gradientLineChartData}
-              />
-            </Grid>
-          </Grid>
-        </SuiBox> */}
-        {/* <Grid container spacing={3}>
-          <Grid item xs={12} md={6} lg={8}>
-            <Projects />
-          </Grid>
-          <Grid item xs={12} md={6} lg={4}>
-            <OrderOverview />
-          </Grid>
-        </Grid> */}
       </SuiBox>
     </DashboardLayout>
   );
